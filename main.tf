@@ -42,6 +42,27 @@ resource "aws_internet_gateway" "gw" {
   }
 }
 
+#CREATING ELASTIC IP WHICH WILL BW ASSOCIATED WITH NAT GATEWAY
+resource "aws_eip" "EIP1" {
+  tags = {
+    Env = "dev"
+  }
+}
+
+#CREATE NAT GATEWAY IN PUBLIC SUBNET 
+resource "aws_nat_gateway" "example" {
+  allocation_id = aws_eip.EIP1.id #NATGATEWAY SHOULD HAVE ELASTIC IP
+  subnet_id     = aws_subnet.public1.id #VVIMP IT's ALWAYS RECOMMENDED THAT NAT GATEWAY SHOULD BE CREATED IN PUBLIC SUBNET
+
+  tags = {
+    Name = "gw NAT"
+  }
+
+  # To ensure proper ordering, it is recommended to add an explicit dependency
+  # on the Internet Gateway for the VPC.
+  depends_on = [aws_internet_gateway.gw]
+}
+
 #CREATING PUBLIC ROUTE TABLE
 resource "aws_route_table" "publicRT" {
   vpc_id = aws_vpc.main.id
@@ -72,3 +93,17 @@ resource "aws_route_table" "privateRT" {
     Name = "PRIVATE-RT-1"
   }
 }
+
+#CREATING ROUTE FOR PRIVATE ROUTE TABLE
+resource "aws_route" "private" {
+  route_table_id         = aws_route_table.privateRT.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id             = aws_nat_gateway.example.id
+}
+
+#SUBNET ASSOCIATE WITH ROUTE OF PRIVATE  ROUTE TABLE
+resource "aws_route_table_association" "private1" {
+  subnet_id      = aws_subnet.private1.id
+  route_table_id = aws_route_table.privateRT.id
+}
+
