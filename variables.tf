@@ -30,3 +30,7 @@ variable "private_subnet1_cidr_block" {
   type        = string
   description = "List of private subnet CIDR blocks"
 }
+
+variable "aws_key_pair" {
+  default = "/home/ubuntu/bastio"
+}
