@@ -153,7 +153,6 @@ resource "aws_security_group" "VPN-SG" {
     from_port        = 443
     to_port          = 443
     protocol         = "tcp"
-#    cidr_blocks      = [aws_vpc.main.cidr_block]
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -169,21 +168,11 @@ resource "aws_security_group" "VPN-SG" {
   }
 }
 
-#resource "aws_key_pair" "deployer" {
-#  key_name   = "deployer-key"
-#  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDdUUO00ZEdocRDh7ZINGibSTjcqLIm7a45gm9bjDfcT0Zg9eBNxQFmQdZBIllqF1PrVLfSm9dr1WhFKbpoJ7Mks7WHDwtr7xmbkiWN35wjHSjwJOTKRp1bdccrjtZMqWFgwYTh455yFcSQT3fqmM7AnhcYubWOy+9AUki/+ZU1f5FYh9gTyz6GqTxyhIz66pzgTA5zXtsXmK1HERtdSS7qYCjX5KxvflqK1/aaHHxFIZye4gSDbm1sv/4nw2+BBRG60ZULRcwcWSXoE3GrhFKpUMIXvMeTjdB5coeEgfRL7dMC4rU5c/NrsEIF/S+wGnAu344EldJCo9AG4k3UQAWT BASTION HOST"
-#}
-
 resource "aws_instance" "myfirst_instance" {
   ami           = "ami-0fb653ca2d3203ac1" # us-west-2
   instance_type = "t2.micro"
   key_name = "BASTION HOST"
   subnet_id = aws_subnet.public1.id
-#  network_interface {
-#    network_interface_id = aws_network_interface.first_network_interface.id
-#    device_index         = 0
-#  }
-#  security_groups = ["VPN_SG"]
   vpc_security_group_ids = [aws_security_group.VPN-SG.id]
   tags = {
     Name = "VPN"
@@ -210,7 +199,6 @@ resource "aws_security_group_rule" "BASTION-HOST-SG-RULE" {
   to_port          = 22
   protocol         = "tcp"
   source_security_group_id = aws_security_group.VPN-SG.id
-#  cidr_blocks      = ["0.0.0.0/0"]
 }
 
 #ADDING OUTBOUND RULE FOR BASTION HOST SECURITY GROUP
@@ -222,21 +210,6 @@ resource "aws_security_group_rule" "BASTION-HOST-SG-OUTBOUND-RULE" {
   protocol         = "-1"
   cidr_blocks      = ["0.0.0.0/0"]
 }
-
-
-#
-#
-#  egress {
-#    from_port        = 0
-#    to_port          = 0
-#    protocol         = "-1"
-#    cidr_blocks      = ["0.0.0.0/0"]
-#  }
-#
-#  tags = {
-#    Name = "BASTION-HOST SECURITY GROUP"
-#  }
-
 
 #CREATE BASTION HOST
 
@@ -273,7 +246,7 @@ resource "aws_security_group_rule" "BLISS-APP-SG-RULE" {
 #  cidr_blocks      = ["0.0.0.0/0"]
 }
 
-#ADDING OUTBOUND RULE FOR BASTION HOST SECURITY GROUP
+#ADDING OUTBOUND RULE FOR BLISS APP SECURITY GROUP
 resource "aws_security_group_rule" "BLISS-APP-SG-OUTBOUND-RULE" {
   security_group_id = aws_security_group.BLISS-APP-SG.id
   type              = "egress"
@@ -284,8 +257,6 @@ resource "aws_security_group_rule" "BLISS-APP-SG-OUTBOUND-RULE" {
 }
 
 #CREATE BLISS APP SERVER
-
-#CREATE BASTION HOST
 
 resource "aws_instance" "bliss_app_server" {
   ami           = "ami-0fb653ca2d3203ac1" # us-west-2
@@ -298,3 +269,177 @@ resource "aws_instance" "bliss_app_server" {
   }
 }
 
+#CREATE BLISS DB SG
+resource "aws_security_group" "BLISS-DB-SG" {
+  name        = "BLISS-DB-SG"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.main.id
+  tags = {
+    Name = "BLISS DB SECURITY GROUP"
+  }
+}
+
+
+#ADDING INBOUND RULE FOR BLISS DB SECURITY GROUP
+resource "aws_security_group_rule" "BLISS-DB-SG-SSH-RULE" {
+  security_group_id = aws_security_group.BLISS-DB-SG.id
+  type              = "ingress"
+  from_port        = 22
+  to_port          = 22
+  protocol         = "tcp"
+  source_security_group_id = aws_security_group.BASTION-HOST-SG.id
+#  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "BLISS-DB-SG-MONGODB-RULE" {
+  security_group_id = aws_security_group.BLISS-DB-SG.id
+  type              = "ingress"
+  from_port        = 27017
+  to_port          = 27017
+  protocol         = "tcp"
+  source_security_group_id = aws_security_group.BLISS-APP-SG.id
+#  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+#ADDING OUTBOUND RULE FOR BLISS DB SECURITY GROUP
+resource "aws_security_group_rule" "BLISS-DB-SG-OUTBOUND-RULE" {
+  security_group_id = aws_security_group.BLISS-DB-SG.id
+  type              = "egress"
+  from_port        = 0
+  to_port          = 0
+  protocol         = "-1"
+  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+#CREATE BLISS DB SERVER
+
+resource "aws_instance" "bliss_DB_server" {
+  ami           = "ami-0fb653ca2d3203ac1" # us-west-2
+  instance_type = "t2.micro"
+  key_name = "BASTION HOST"
+  subnet_id = aws_subnet.private1.id
+  vpc_security_group_ids = [aws_security_group.BLISS-DB-SG.id]
+  tags = {
+    Name = "BLISS DB"
+  }
+}
+
+#CREATE ANNOTATION APP SECURITY GROUP
+resource "aws_security_group" "ANNOTATION-APP-SG" {
+  name        = "ANNOTATION-APP-SG"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.main.id
+  tags = {
+    Name = "ANNOTATION-APP SECURITY GROUP"
+  }
+}
+
+
+#ADDING INBOUND RULE FOR ANNOTATION APP SECURITY GROUP
+resource "aws_security_group_rule" "ANNOTATION-APP-SG-SSH-RULE" {
+  security_group_id = aws_security_group.ANNOTATION-APP-SG.id
+  type              = "ingress"
+  from_port        = 22
+  to_port          = 22
+  protocol         = "tcp"
+  source_security_group_id = aws_security_group.BASTION-HOST-SG.id
+#  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+#ADDING OUTBOUND RULE FOR ANNOTATION APP SECURITY GROUP
+resource "aws_security_group_rule" "ANNOTATION-APP-SG-OUTBOUND-RULE" {
+  security_group_id = aws_security_group.ANNOTATION-APP-SG.id
+  type              = "egress"
+  from_port        = 0
+  to_port          = 0
+  protocol         = "-1"
+  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+#CREATE ANNOTATION APP SERVER
+
+resource "aws_instance" "Annotation_APP_server" {
+  ami           = "ami-0fb653ca2d3203ac1" # us-west-2
+  instance_type = "t2.micro"
+  key_name = "BASTION HOST"
+  subnet_id = aws_subnet.private1.id
+  vpc_security_group_ids = [aws_security_group.ANNOTATION-APP-SG.id]
+  tags = {
+    Name = "ANNOTATION-APP"
+  }
+}
+
+#CREATE ANNOTATION DB SECURITY GROUP
+resource "aws_security_group" "ANNOTATION-DB-SG" {
+  name        = "ANNOTATION-DB-SG"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.main.id
+  tags = {
+    Name = "ANNOTATION-DB SECURITY GROUP"
+  }
+}
+
+
+#ADDING INBOUND RULE FOR ANNOTATION DB SECURITY GROUP
+resource "aws_security_group_rule" "ANNOTATION-DB-SG-SSH-RULE" {
+  security_group_id = aws_security_group.ANNOTATION-DB-SG.id
+  type              = "ingress"
+  from_port        = 22
+  to_port          = 22
+  protocol         = "tcp"
+  source_security_group_id = aws_security_group.BASTION-HOST-SG.id
+#  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "ANNOTATION-DB-SG-POSTGRES-RULE" {
+  security_group_id = aws_security_group.ANNOTATION-DB-SG.id
+  type              = "ingress"
+  from_port        = 5432
+  to_port          = 5432
+  protocol         = "tcp"
+  source_security_group_id = aws_security_group.ANNOTATION-APP-SG.id
+#  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "ANNOTATION-DB-SG-ELASTICSEARCH1-RULE" {
+  security_group_id = aws_security_group.ANNOTATION-DB-SG.id
+  type              = "ingress"
+  from_port        = 9200
+  to_port          = 9200
+  protocol         = "tcp"
+  source_security_group_id = aws_security_group.ANNOTATION-APP-SG.id
+#  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "ANNOTATION-DB-SG-ELASTICSEARCH2-RULE" {
+  security_group_id = aws_security_group.ANNOTATION-DB-SG.id
+  type              = "ingress"
+  from_port        = 9300
+  to_port          = 9300
+  protocol         = "tcp"
+  source_security_group_id = aws_security_group.ANNOTATION-APP-SG.id
+#  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+#ADDING OUTBOUND RULE FOR ANNOTATION APP SECURITY GROUP
+resource "aws_security_group_rule" "ANNOTATION-DB-SG-OUTBOUND-RULE" {
+  security_group_id = aws_security_group.ANNOTATION-DB-SG.id
+  type              = "egress"
+  from_port        = 0
+  to_port          = 0
+  protocol         = "-1"
+  cidr_blocks      = ["0.0.0.0/0"]
+}
+
+#CREATE ANNOTATION DB SERVER
+
+resource "aws_instance" "Annotation_DB_server" {
+  ami           = "ami-0fb653ca2d3203ac1" # us-west-2
+  instance_type = "t2.micro"
+  key_name = "BASTION HOST"
+  subnet_id = aws_subnet.private1.id
+  vpc_security_group_ids = [aws_security_group.ANNOTATION-DB-SG.id]
+  tags = {
+    Name = "ANNOTATION-DB"
+  }
+}
